@@ -14,3 +14,6 @@ paths = entries.map { |e| File.join(folder, e) }
 files_by_path = paths.map { |p| [p, File.new(p)] }.to_h
 files_by_path = files_by_path.filter { |p, f| File.file?(f) }
 content_by_path = files_by_path.map { |p, f| [p, f.read()] }.to_h
+lines_by_path = content_by_path.map { |p, c| [p, c.lines.map(&:strip)] }.to_h
+
+puts(lines_by_path)
