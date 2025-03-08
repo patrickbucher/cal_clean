@@ -17,3 +17,9 @@ content_by_path = files_by_path.map { |p, f| [p, f.read()] }.to_h
 lines_by_path = content_by_path.map { |p, c| [p, c.lines.map(&:strip)] }.to_h
 
 puts(lines_by_path)
+
+# TODO
+# - for each file, cut out sections from BEGIN:VEVENT until END:VEVENT
+# - parse DTSART:[DATE] and DTSTART;TDZID=[TZ:DATE]
+# - get the earliest (i.e. minimal) date for each file
+# - delete (or list for dry run) each file
