@@ -70,6 +70,7 @@ start_dates_by_path =
 to_be_deleted = start_dates_by_path.filter { |k, v| v < cutoff_date }
 
 to_be_deleted.each do |k, v|
-  # TODO: actually delete files after gaining enough confidence
-  puts("#{v.strftime("%Y-%m-%d")}\t#{k}")
+  f = File.new(k)
+  File.delete(f)
+  puts("#{v.strftime("%Y-%m-%d")}\t#{k} deleted")
 end
