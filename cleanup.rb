@@ -2,24 +2,74 @@
 
 require "date"
 
-folder = ARGV[0]
-date = Date.parse(ARGV[1])
-if date.nil?
-  exit
+def extract_sub_sequences(seq, start_with, end_with)
+  sub_sequences = []
+  sub_sequence = []
+  within = false
+  seq.each do |entry|
+    if entry == start_with
+      if within
+        raise "nested sub-sequences"
+      else
+        within = true
+      end
+    elsif entry == end_with
+      if !within
+        raise "closing unopened sub-sequence"
+      else
+        sub_sequences << sub_sequence
+        sub_sequence = []
+        within = false
+      end
+    elsif within
+      sub_sequence << entry
+    end
+  end
+  sub_sequences
 end
-delete_until_datetime = Time.new(date.year, date.month, date.day, 23, 59, 59)
+
+def parse_file(path)
+  f = File.new(path)
+  return nil unless File.file?(f)
+
+  content = f.read()
+  lines = content.lines.map(&:strip)
+  events = extract_sub_sequences(lines, "BEGIN:VEVENT", "END:VEVENT")
+  { path: path, events: events }
+end
+
+def extract_start_date(lines)
+  start_date_lines = lines.filter { |l| l.start_with?("DTSTART") }
+  raise "ambiguous start date" if start_date_lines.count != 1
+
+  start_date_line = start_date_lines.first
+  parts = start_date_line.split(":")
+  raise "multiple : on line #{start_date_line}" if parts.count != 2
+
+  DateTime.parse(parts[1]).to_date
+end
+
+folder = ARGV[0]
+cutoff_date = Date.parse(ARGV[1])
+if cutoff_date.nil?
+  exit(1)
+end
+delete_until_datetime = Date.new(cutoff_date.year, cutoff_date.month, cutoff_date.day)
 
 entries = Dir.entries(folder)
 paths = entries.map { |e| File.join(folder, e) }
-files_by_path = paths.map { |p| [p, File.new(p)] }.to_h
-files_by_path = files_by_path.filter { |p, f| File.file?(f) }
-content_by_path = files_by_path.map { |p, f| [p, f.read()] }.to_h
-lines_by_path = content_by_path.map { |p, c| [p, c.lines.map(&:strip)] }.to_h
+events_by_path =
+  paths
+    .map { |p| parse_file(p) }
+    .filter { |e| e }
+    .reduce({}) { |acc, e| acc.update({ e[:path] => e[:events] }) }
+start_dates_by_path =
+  events_by_path
+    .filter { |_, v| !v.empty? }
+    .map { |k, v| [k, v.map { |e| extract_start_date(e) }.min] }.to_h
+to_be_deleted = start_dates_by_path.filter { |k, v| v < cutoff_date }
 
-puts(lines_by_path)
-
-# TODO
-# - for each file, cut out sections from BEGIN:VEVENT until END:VEVENT
-# - parse DTSART:[DATE] and DTSTART;TDZID=[TZ:DATE]
-# - get the earliest (i.e. minimal) date for each file
-# - delete (or list for dry run) each file
+to_be_deleted.each do |k, v|
+  # TODO: actually delete files after gaining enough confidence
+  puts("delete #{k} from #{v.strftime("%Y-%m-%d")}")
+end
